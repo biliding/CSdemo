@@ -1,0 +1,4 @@
+SERVER文件夹中存放的是server端的代码
+CLIENT文件夹中存放的是client端的代码
+
+运行对应文件夹下的build.sh即可生成相应的可执行程序。

@@ -1,0 +1,110 @@
+#!/bin/bash 
+
+PROGECTOR_DFLAG = -D$(PRODUCT_SERIAS)
+PROGECTOR_DFLAG += -DHD_FILE_TEST
+
+#≈‰÷√±‡“Î√¸¡Ó
+CC  = $(MAKE_COMPILE)gcc
+CXX = $(MAKE_COMPILE)g++
+LD  = $(MAKE_COMPILE)ld
+AR  = $(MAKE_COMPILE)ar
+RANLIB = $(MAKE_COMPILE)ranlib
+STRIP = $(MAKE_COMPILE)strip
+OBJCOPY = $(MAKE_COMPILE)objcopy
+
+EMPTY=
+OPTIONS=$(options)
+
+
+#add predef sysmbols
+PROGECTOR_DFLAG += -D__linux__
+
+#add complie choice
+PROGECTOR_CFLAG = -O2 -Wall -fPIC #-g
+#add need static-libs
+#“¿¿µø‚
+LIB_BASELIB   = 
+LIB_FRAMEWORK = 
+LIB_SYSLIB    =  -lpthread -lm -lrt -ldl -lresolv -lstdc++
+
+
+#add source files
+SRC_FRAMEWORK  = framework/server-socket \
+                 #framework/vbc_mng \			 
+SRC_MAIN       = main
+
+DIR_PATH       = ./
+DIR_SRCS       =  $(SRC_DEMO) $(SRC_FRAMEWORK) $(SRC_MAIN)
+#get source file
+PROGECTOR_CSRCS  = $(foreach dirs,$(DIR_SRCS),$(filter %.c, $(wildcard $(DIR_PATH)$(dirs)/*))) 
+PROGECTOR_CPPSRCS= $(foreach dirs,$(DIR_SRCS),$(filter %.cpp, $(wildcard $(DIR_PATH)$(dirs)/*))) 
+#get object file
+PROGECTOR_COBJS  = $(PROGECTOR_CSRCS:%.c=%.o)
+PROGECTOR_CPPOBJS= $(PROGECTOR_CPPSRCS:%.cpp=%.o)
+#get depend diles
+PROGECTOR_CDEPS  = $(PROGECTOR_CSRCS:%.c=%.d)
+PROGECTOR_CPPDEPS = $(PROGECTOR_CPPSRCS:%.cpp=%.d)
+
+
+#add include files
+DIR_INCLUDES    = ./h/Base \
+				  ./h/server-socket
+                  
+				  
+PROGECTOR_INCLUDES = $(foreach dirs,$(DIR_INCLUDES),-I$(wildcard $(dirs)))
+
+
+PROGECTOR_TARGET   = server_app
+#rules to make apppro
+$(MAKECMDGOALS): $(PROGECTOR_TARGET)
+$(PROGECTOR_TARGET):$(PROGECTOR_COBJS) $(PROGECTOR_CPPOBJS)
+	@echo "start compile apppro......"
+	@$(CC) $^  $(PROGECTOR_DFLAG) $(PROGECTOR_CFLAG)  $(LIB_D) $(PROGECTOR_LIBS) $(PROGECTOR_LIBSO) -o $@ -Wl,-Map,$(PROGECTOR_TARGET).map
+	@cp -fr $@ $@.no_strip
+	@$(OBJCOPY) --only-keep-debug $@.no_strip $@.sym
+	@$(STRIP) $@
+	@$(STRIP) -x -R .note -R .comment $@
+	@echo "compile apppro success @ `date`"
+	@cp -f $@ $(HICORE_DEST_DIR)
+    #@rm -fr $(SRC_MAIN)/*.o
+	
+ifeq ($(words $(findstring $(WITH_SLAVE), yes YES)), 1)
+	@cp -f $@ $(HICORE_DEST_SUB_DIR)
+	@find ./business/NetAdapt/lib/ -type f -name *.so | xargs -i cp  {}  $(HICORE_DEST_SUB_DIR)
+endif
+
+-include $(PROGECTOR_CDEPS) $(PROGECTOR_CPPDEPS)
+
+#generate depend file	
+%.d: %.c
+	@echo create depend file $@....
+	@set -e; rm -f $@
+		@#<--------make $*.o: $*.h... to $*.o $*.d: $*.h ...------->
+	@$(CC) -MM -E $(PROGECTOR_INCLUDES) -I$(dir $@) $< > $@.$$$$; \
+	sed 's,\($(notdir $*)\)\.o[ :]*,$(dir $*)\1.o: ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
+		@#<-------add rules to make .o files----------------------->
+	@echo '	@echo "         CC    $$(notdir $$<)"' >> $@
+	@echo '	@$$(CC) $$(PROGECTOR_CFLAG) $$(PROGECTOR_DFLAG) $$(PROGECTOR_INCLUDES) -I$(dir $@) -c $$(filter %.c, $$^) -o $$(filter %.o, $$@)' >> $@ 
+		@#<-------add default rules in case of MM failed----------->
+	@sed '1 idefault-$(@):' -i $@
+	
+%.d: %.cpp
+	@echo create depend file $@....
+	@set -e; rm -f $@
+		@#<--------make $*.o: $*.h... to $*.o $*.d: $*.h ...------->
+	@$(CXX) -MM -E $(PROGECTOR_INCLUDES) -I$(dir $@) $< > $@.$$$$; \
+	sed 's,\($(notdir $*)\)\.o[ :]*,$(dir $*)\1.o  : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
+		@#<-------add rules to make .o files----------------------->
+	@echo '	@echo "         CXX   $$(notdir $$<)"' >> $@
+	@echo '	@$$(CXX) $$(PROGECTOR_CFLAG) $$(PROGECTOR_DFLAG) $$(PROGECTOR_INCLUDES) -I$(dir $@) -c $$(filter %.cpp, $$^) -o $$(filter %.o, $$@)' >> $@ 
+		@#<-------add default rules in case of MM failed----------->
+	@sed '1 idefault-$(@):' -i $@
+
+clean:
+	rm -rf  $(PROGECTOR_COBJS) $(PROGECTOR_CPPOBJS) $(PROGECTOR_CDEPS) $(PROGECTOR_CPPDEPS) 	
+
+.PHONY:clean
+	
+	
